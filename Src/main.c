@@ -37,6 +37,8 @@
 #define LED1  1
 #define ON    0
 #define OFF   1
+
+#define SWITCH(x)       (~(x) & 0x1)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,7 +49,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+uint8_t led_value[2] = {OFF, OFF};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -81,6 +83,70 @@ int led_control(uint8_t num, uint8_t status)
 
   return 0;
 }
+
+/**
+  * @brief  key_sacn
+  * @retval int
+  */
+int key_scan(void)
+{
+  GPIO_PinState state[3];
+  uint8_t value = 0;
+
+  // 按下是低电平0
+  state[0] = HAL_GPIO_ReadPin(KEY0_GPIO_Port, KEY0_Pin);
+  state[1] = HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin);
+
+  // 按下是高电平1
+  state[2] = HAL_GPIO_ReadPin(KEY_UP_GPIO_Port, KEY_UP_Pin);
+
+  // 取反, 使其按下后也是1
+  state[0] = SWITCH(state[0]);
+  state[1] = SWITCH(state[1]);
+  value = state[0] | (state[1] << 1) | (state[2] << 2);
+
+  // 松手监测
+  while(1)
+  {
+    state[0] = HAL_GPIO_ReadPin(KEY0_GPIO_Port, KEY0_Pin);
+    state[1] = HAL_GPIO_ReadPin(KEY1_GPIO_Port, KEY1_Pin);
+    state[2] = HAL_GPIO_ReadPin(KEY_UP_GPIO_Port, KEY_UP_Pin);
+    state[0] = SWITCH(state[0]);
+    state[1] = SWITCH(state[1]);
+
+    if((state[0] | (state[1] << 1) | (state[2] << 2)) == 0)
+    {
+      break;
+    }
+  }
+
+  return value;
+}
+
+/**
+  * @brief  key_control
+  * @retval int
+  */
+void key_control(int value)
+{
+  if(value == 0x1)
+  {
+    led_value[0] = SWITCH(led_value[0]);
+    led_control(LED0, led_value[0]);
+  }
+  else if(value == 0x2)
+  {
+    led_value[1] = SWITCH(led_value[1]);
+    led_control(LED1, led_value[1]);
+  }
+  else if(value == 0x4)
+  {
+    led_value[0] = SWITCH(led_value[0]);
+    led_value[1] = SWITCH(led_value[1]);
+    led_control(LED0, led_value[0]);
+    led_control(LED1, led_value[1]);
+  }
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -95,7 +161,7 @@ int led_control(uint8_t num, uint8_t status)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  int value;
   /* USER CODE END 1 */
   
 
@@ -125,13 +191,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    led_control(LED0, ON);
-    led_control(LED1, ON);
-    HAL_Delay(50);
-
-    led_control(LED0, OFF);
-    led_control(LED1, OFF);
-    HAL_Delay(50);
+    value = key_scan();
+    key_control(value);
+    HAL_Delay(10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
